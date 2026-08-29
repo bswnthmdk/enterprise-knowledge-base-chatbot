@@ -3,12 +3,18 @@ import { PDFParse } from "pdf-parse";
 import { Document } from "@langchain/core/documents"; // to store the extracted text and metadata
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { Pinecone } from "@pinecone-database/pinecone";
+import { PineconeStore } from "@langchain/pinecone";
 
 // Create embeddings for the chunks using Google Generative AI Embeddings
 const embeddings = await new GoogleGenerativeAIEmbeddings({
   model: "gemini-embedding-001",
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GOOGLE_API_KEY,
 });
+
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+console.log("Pinecone index:", process.env.PINECONE_INDEX_NAME);
+const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
 
 // Function that loads a PDF file and converts it into a LangChain Document
 export async function documentLoader(filePath) {
@@ -17,6 +23,8 @@ export async function documentLoader(filePath) {
   const parser = new PDFParse({ data: dataBuffer }); // Create a PDF parser using the PDF file data
 
   const pdfData = await parser.getText(); // Extract text from the PDF
+  console.log("Extracted text length:", pdfData.text.length);
+  console.log("Extracted text:", pdfData.text.slice(0, 500));
 
   // Create a LangChain Document from the extracted PDF text
   const document = new Document({
@@ -34,8 +42,22 @@ export async function documentLoader(filePath) {
     chunkOverlap: 0, // Define the character overlap between chunks of text
   });
 
-  const chunks = await splitter.splitDocuments([document]); // Split the document into smaller chunks
+  const documents = await splitter.splitDocuments([document]); // Split the document into smaller chunks
 
-  console.log("No of chunks:", chunks.length); // Display the LangChain Documents
-  console.log(chunks);
+  if (documents.length === 0) {
+    throw new Error("No text chunks were created from the PDF.");
+  } else {
+    console.log("No of chunks:", documents.length); // Display the LangChain Documents
+  }
+  const pineconeStore = await PineconeStore.fromDocuments(
+    documents,
+    embeddings,
+    {
+      pineconeIndex: index,
+      namespace: "cg-internal-docs",
+    },
+  );
+  console.log("Successfully stored documents in Pinecone");
+  const stats = await index.describeIndexStats();
+  console.log("Pinecone stats:", stats);
 }
