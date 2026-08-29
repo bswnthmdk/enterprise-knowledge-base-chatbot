@@ -11,6 +11,13 @@ import { documentLoader } from "./documentLoader.js";
 const app = express();
 const upload = multer({
   dest: "documents/",
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed"));
+    }
+  },
 });
 
 app.use(cors());
@@ -18,11 +25,11 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-app.get("/", (req, res) => {
+app.get("/api/", (req, res) => {
   res.send("Welcome to Your Enterprise Chat Bot!");
 });
 
-app.post("/chat", async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   try {
     const { message, sessionId } = req.body;
 
@@ -52,7 +59,7 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -60,7 +67,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       });
     }
 
-    // Send uploaded PDF to the RAG ingestion pipeline
     await documentLoader(req.file.path);
 
     res.status(200).json({
@@ -72,6 +78,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     res.status(500).json({
       error: "Failed to process document",
     });
+  } finally {
+    if (req.file) {
+      fs.unlink(req.file.path, (error) => {
+        if (error) {
+          console.error("Failed to delete temporary file:", error);
+        }
+      });
+    }
   }
 });
 
