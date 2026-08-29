@@ -1,6 +1,14 @@
 import fs from "fs"; // built-in module used to read the PDF file
 import { PDFParse } from "pdf-parse";
 import { Document } from "@langchain/core/documents"; // to store the extracted text and metadata
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+
+// Create embeddings for the chunks using Google Generative AI Embeddings
+const embeddings = await new GoogleGenerativeAIEmbeddings({
+  model: "gemini-embedding-001",
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 // Function that loads a PDF file and converts it into a LangChain Document
 export async function documentLoader(filePath) {
@@ -21,5 +29,13 @@ export async function documentLoader(filePath) {
 
   await parser.destroy(); // Release resources used by the PDF parser
 
-  console.log(document.pageContent); // Display the LangChain Document
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 500, // Define the character size of each chunk of text
+    chunkOverlap: 0, // Define the character overlap between chunks of text
+  });
+
+  const chunks = await splitter.splitDocuments([document]); // Split the document into smaller chunks
+
+  console.log("No of chunks:", chunks.length); // Display the LangChain Documents
+  console.log(chunks);
 }
