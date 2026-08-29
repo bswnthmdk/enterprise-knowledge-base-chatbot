@@ -13,7 +13,7 @@ const embeddings = await new GoogleGenerativeAIEmbeddings({
 });
 
 const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-console.log("Pinecone index:", process.env.PINECONE_INDEX_NAME);
+
 const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
 
 // Function that loads a PDF file and converts it into a LangChain Document
